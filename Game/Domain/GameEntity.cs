@@ -91,9 +91,8 @@ namespace Game.Domain
                 }).ToList()
             };
 
-            // Определяем победителя тура
             var decisions = Players.Select(p => p.Decision.Value).Distinct().ToList();
-            if (decisions.Count == 2) // Есть победитель
+            if (decisions.Count == 2)
             {
                 var winnerDecision = GetWinningDecision(decisions[0], decisions[1]);
                 var winner = Players.First(p => p.Decision == winnerDecision);
@@ -105,7 +104,7 @@ namespace Game.Domain
                     player.Result = player.UserId == winner.UserId ? TurnResult.Won : TurnResult.Lost;
                 }
             }
-            else // Ничья
+            else
             {
                 foreach (var player in currentTurn.Players)
                 {
@@ -113,7 +112,6 @@ namespace Game.Domain
                 }
             }
 
-            // Сбрасываем решения для следующего тура
             foreach (var player in Players)
             {
                 player.Decision = null;
