@@ -9,6 +9,7 @@ namespace ConsoleApp
     {
         private readonly IUserRepository userRepo;
         private readonly IGameRepository gameRepo;
+        private readonly IGameTurnRepository gameTurnRepo;
         private readonly Random random = new Random();
 
         private Program(string[] args)
@@ -19,6 +20,7 @@ namespace ConsoleApp
 
             userRepo = new InMemoryUserRepository();
             gameRepo = new MongoGameRepository(database);
+            gameTurnRepo = new MongoGameTurnRepository(database);
         }
 
         public static void Main(string[] args)
@@ -130,8 +132,8 @@ namespace ConsoleApp
 
             if (game.HaveDecisionOfEveryPlayer)
             {
-                // TODO: Сохранить информацию о прошедшем туре в IGameTurnRepository. Сформировать информацию о закончившемся туре внутри FinishTurn и вернуть её сюда.
-                game.FinishTurn();
+                var finishedTurn = game.FinishTurn();
+                gameTurnRepo.Insert(finishedTurn);
             }
 
             ShowScore(game);
@@ -185,7 +187,26 @@ namespace ConsoleApp
         private void ShowScore(GameEntity game)
         {
             var players = game.Players;
-            // TODO: Показать информацию про 5 последних туров: кто как ходил и кто в итоге выиграл. Прочитать эту информацию из IGameTurnRepository
+
+            var lastTurns = gameTurnRepo.GetLastTurns(game.Id, 5);
+            if (lastTurns.Count != 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Last turns:");
+                foreach (var turn in lastTurns.OrderBy(t => t.TurnIndex))
+                {
+                    var humanPlayer = turn.Players.First(p => p.UserId == players[0].UserId);
+                    var aiPlayer = turn.Players.First(p => p.UserId == players[1].UserId);
+
+                    string resultText = turn.WinnerId.HasValue
+                        ? turn.WinnerId == players[0].UserId ? "Human won" : "AI won"
+                        : "Draw";
+
+                    Console.WriteLine($"Turn {turn.TurnIndex + 1}: Human: {humanPlayer.Decision} vs AI: {aiPlayer.Decision} - {resultText}");
+                }
+                Console.WriteLine();
+            }
+
             Console.WriteLine($"Score: {players[0].Name} {players[0].Score} : {players[1].Score} {players[1].Name}");
         }
     }

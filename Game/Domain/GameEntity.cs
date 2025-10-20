@@ -78,28 +78,60 @@ namespace Game.Domain
 
         public GameTurnEntity FinishTurn()
         {
-            var winnerId = Guid.Empty;
-            for (int i = 0; i < 2; i++)
+            if (!HaveDecisionOfEveryPlayer)
+                throw new InvalidOperationException("Not all players made decisions");
+
+            var currentTurn = new GameTurnEntity(Id, CurrentTurnIndex)
             {
-                var player = Players[i];
-                var opponent = Players[1 - i];
-                if (!player.Decision.HasValue || !opponent.Decision.HasValue)
-                    throw new InvalidOperationException();
-                if (player.Decision.Value.Beats(opponent.Decision.Value))
+                Players = Players.Select(p => new PlayerTurnResult
                 {
-                    player.Score++;
-                    winnerId = player.UserId;
+                    UserId = p.UserId,
+                    UserName = p.Name,
+                    Decision = p.Decision.Value
+                }).ToList()
+            };
+
+            // Определяем победителя тура
+            var decisions = Players.Select(p => p.Decision.Value).Distinct().ToList();
+            if (decisions.Count == 2) // Есть победитель
+            {
+                var winnerDecision = GetWinningDecision(decisions[0], decisions[1]);
+                var winner = Players.First(p => p.Decision == winnerDecision);
+                winner.Score++;
+                currentTurn.WinnerId = winner.UserId;
+
+                foreach (var player in currentTurn.Players)
+                {
+                    player.Result = player.UserId == winner.UserId ? TurnResult.Won : TurnResult.Lost;
                 }
             }
-            //TODO Заполнить все внутри GameTurnEntity, в том числе winnerId
-            var result = new GameTurnEntity();
-            // Это должно быть после создания GameTurnEntity
+            else // Ничья
+            {
+                foreach (var player in currentTurn.Players)
+                {
+                    player.Result = TurnResult.Draw;
+                }
+            }
+
+            // Сбрасываем решения для следующего тура
             foreach (var player in Players)
+            {
                 player.Decision = null;
+            }
+
             CurrentTurnIndex++;
-            if (CurrentTurnIndex == TurnsCount)
-                Status = GameStatus.Finished;
-            return result;
+
+            return currentTurn;
+        }
+
+        private static PlayerDecision GetWinningDecision(PlayerDecision decision1, PlayerDecision decision2)
+        {
+            if ((decision1 == PlayerDecision.Rock && decision2 == PlayerDecision.Scissors) ||
+                (decision1 == PlayerDecision.Scissors && decision2 == PlayerDecision.Paper) ||
+                (decision1 == PlayerDecision.Paper && decision2 == PlayerDecision.Rock))
+                return decision1;
+
+            return decision2;
         }
     }
 }
